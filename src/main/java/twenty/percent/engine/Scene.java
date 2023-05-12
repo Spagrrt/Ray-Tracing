@@ -12,37 +12,30 @@ public class Scene{
 
     private String vertexShaderSrc = "#version 330 core\n" +
             "layout (location=0) in vec3 aPos;\n" +
-            "layout (location=1) in vec4 aColor;\n" +
-            "\n" +
-            "out vec4 fColor;\n" +
             "\n" +
             "void main(){\n" +
-            "    fColor = aColor;\n" +
             "    gl_Position = vec4(aPos, 1.0);\n" +
             "}";
 
     private String fragmentShaderSrc = "#version 330 core\n" +
             "\n" +
-            "in vec4 fColor;\n" +
-            "\n" +
-            "out vec4 color;\n" +
-            "\n" +
             "void main(){\n" +
-            "    color = fColor;\n" +
+            "    gl_FragColor = vec4(gl_FragCoord.x / 1920.0, 0.0, gl_FragCoord.y / 1080.0, 1.0);\n" +
             "}";
 
     private int vertexID, fragmentID, shaderProgram;
 
     private float[] vertexArray = {
-            //position                  //color
-            -0.5f, -0.65f, 0.0f,        1.0f, 0.0f, 0.0f, 1.0f, //Bottom Left   0
-            0.5f, -0.65f, 0.0f,        0.0f, 1.0f, 0.0f, 1.0f, //Bottom Right  1
-            0.0f,  0.65f, 0.0f,        0.0f, 0.0f, 1.0f, 1.0f  //Top           2
+            -1.0f, 1.0f, 0.0f,
+            -1.0f, -1.0f, 0.0f,
+            1.0f, -1.0f, 0.0f,
+            1.0f, 1.0f, 0.0f
     };
 
     //IMPORTANT: Must be in counter-clockwise order
     private int[] elementArray = {
-            0, 1, 2
+            0, 1, 2,
+            2, 3, 0
     };
 
     private int vaoID, vboID, eboID;
@@ -123,14 +116,10 @@ public class Scene{
 
         //Add the vertex attribute pointers
         int positionSize = 3;
-        int colorSize = 4;
         int floatSizeBytes = 4;
-        int vertexSizeBytes = (positionSize + colorSize) * floatSizeBytes;
+        int vertexSizeBytes = positionSize * floatSizeBytes;
         glVertexAttribPointer(0, positionSize, GL_FLOAT, false, vertexSizeBytes, 0);
         glEnableVertexAttribArray(0);
-
-        glVertexAttribPointer(1, colorSize, GL_FLOAT, false, vertexSizeBytes, positionSize * floatSizeBytes);
-        glEnableVertexAttribArray(1);
     }
 
     public void update() {
@@ -141,13 +130,11 @@ public class Scene{
 
         //Enable vertex attribute pointers
         glEnableVertexAttribArray(0);
-        glEnableVertexAttribArray(1);
 
         glDrawElements(GL_TRIANGLES, elementArray.length, GL_UNSIGNED_INT, 0);
 
         //Unbind everything
         glDisableVertexAttribArray(0);
-        glDisableVertexAttribArray(1);
 
         glBindVertexArray(0);
 
