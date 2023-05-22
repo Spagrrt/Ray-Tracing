@@ -19,10 +19,63 @@ public class Scene{
 
     private String fragmentShaderSrc = "#version 330 core\n" +
             "\n" +
-            "void main(){\n" +
-            "    gl_FragColor = vec4(gl_FragCoord.x / 1920.0, 0.0, gl_FragCoord.y / 1080.0, 1.0);\n" +
+            "#define PI 3.1415926535\n" +
+            "#define FOV 75.0\n" +
+            "#define RATIO 16.0/9.0\n" +
+            "\n" +
+            "struct sphere{\n" +
+            "    vec3 position;\n" +
+            "    float radius;\n" +
+            "    vec3 color;\n" +
+            "};\n" +
+            "\n" +
+            "sphere[] sphereList = { {vec3(0.0, 0.0, 3.0), 1.0, vec3(0.0, 1.0, 0.0)},\n" +
+            "                        {vec3(-2.5, 0.0, 3.0), 1.0, vec3(1.0, 0.0, 0.0)},\n" +
+            "                        {vec3(2.5, 0.0, 3.0), 1.0, vec3(0.0, 0.0, 1.0)}};\n" +
+            "\n" +
+            "\n" +
+            "// credit to wwwtyro on github\n" +
+            "float raySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr) {\n" +
+            "    // - r0: ray origin\n" +
+            "    // - rd: normalized ray direction\n" +
+            "    // - s0: sphere center\n" +
+            "    // - sr: sphere radius\n" +
+            "    // - Returns distance from r0 to first intersecion with sphere,\n" +
+            "    //   or -1.0 if no intersection.\n" +
+            "    float a = dot(rd, rd);\n" +
+            "    vec3 s0_r0 = r0 - s0;\n" +
+            "    float b = 2.0 * dot(rd, s0_r0);\n" +
+            "    float c = dot(s0_r0, s0_r0) - (sr * sr);\n" +
+            "    if (b*b - 4.0*a*c < 0.0) {\n" +
+            "        return -1.0;\n" +
+            "    }\n" +
+            "    return (-b - sqrt((b*b) - 4.0*a*c))/(2.0*a);\n" +
+            "}\n" +
+            "\n" +
+            "vec3 normalize(vec3 terminal){\n" +
+            "    float magnitude = sqrt(terminal.x * terminal.x + terminal.y * terminal.y + terminal.z + terminal.z);\n" +
+            "    return vec3(terminal.x / magnitude, terminal.y / magnitude, terminal.z / magnitude);\n" +
+            "}\n" +
+            "\n" +
+            "void main() {\n" +
+            "\n" +
+            "    vec3 color = vec3(0.0, 0.0, 0.0);\n" +
+            "\n" +
+            "    vec2 fragCoord = vec2(gl_FragCoord.x / (1920.0f / 2.0f) - 1.0f, gl_FragCoord.y / (1080.0f / 2.0f) - 1.0f);\n" +
+            "\n" +
+            "    float planeWidth = tan(FOV * 0.5 * (PI/180.0)) * 2.0;\n" +
+            "    float planeHeight = planeWidth * RATIO;\n" +
+            "    vec3 raydir = vec3(planeHeight * fragCoord.x, planeWidth * fragCoord.y, 1);\n" +
+            "    vec3 nraydir = normalize(raydir);\n" +
+            "\n" +
+            "    for(int i = 0; i < sphereList.length(); i++) {\n" +
+            "        if(raySphereIntersect(vec3(0.0, 0.0, 0.0), nraydir, sphereList[i].position, sphereList[i].radius) >= 0){\n" +
+            "            color = vec3(sphereList[i].color);\n" +
+            "        }\n" +
+            "    }\n" +
+            "\n" +
+            "    gl_FragColor = vec4(color, 1.0);\n" +
             "}";
-
     private int vertexID, fragmentID, shaderProgram;
 
     private float[] vertexArray = {
