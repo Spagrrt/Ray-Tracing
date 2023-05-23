@@ -23,19 +23,39 @@ public class Scene{
             "#define FOV 75.0\n" +
             "#define RATIO 16.0/9.0\n" +
             "\n" +
-            "struct sphere{\n" +
-            "    vec3 position;\n" +
-            "    float radius;\n" +
+            "struct Ray{\n" +
+            "    vec3 origin;\n" +
+            "    vec3 direction;\n" +
+            "};\n" +
+            "\n" +
+            "struct Material{\n" +
             "    vec3 color;\n" +
             "};\n" +
             "\n" +
-            "sphere[] sphereList = { {vec3(0.0, 0.0, 3.0), 1.0, vec3(0.0, 1.0, 0.0)},\n" +
-            "                        {vec3(-2.5, 0.0, 3.0), 1.0, vec3(1.0, 0.0, 0.0)},\n" +
-            "                        {vec3(2.5, 0.0, 3.0), 1.0, vec3(0.0, 0.0, 1.0)}};\n" +
+            "struct Sphere{\n" +
+            "    vec3 position;\n" +
+            "    float radius;\n" +
+            "    Material material;\n" +
+            "};\n" +
+            "\n" +
+            "struct HitInfo{\n" +
+            "    bool didHit;\n" +
+            "    float dist;\n" +
+            "    vec3 hitPoint;\n" +
+            "    Ray normal;\n" +
+            "    Material material;\n" +
+            "};\n" +
+            "\n" +
+            "Sphere[] sphereList = { { vec3(0.0, 0.25, 3.0), 1.0, { vec3(0.0, 1.0, 0.0) }},\n" +
+            "                        { vec3(-0.75, 0.0, 3.0), 1.0, { vec3(1.0, 0.0, 0.0) }},\n" +
+            "                        { vec3(0.75, 0.0, 3.0), 1.0, { vec3(0.0, 0.0, 1.0) }}\n" +
+            "};\n" +
+            "\n" +
+            "\n" +
             "\n" +
             "\n" +
             "// credit to wwwtyro on github\n" +
-            "float raySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr) {\n" +
+            "float RaySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr) {\n" +
             "    // - r0: ray origin\n" +
             "    // - rd: normalized ray direction\n" +
             "    // - s0: sphere center\n" +
@@ -52,9 +72,35 @@ public class Scene{
             "    return (-b - sqrt((b*b) - 4.0*a*c))/(2.0*a);\n" +
             "}\n" +
             "\n" +
-            "vec3 normalize(vec3 terminal){\n" +
-            "    float magnitude = sqrt(terminal.x * terminal.x + terminal.y * terminal.y + terminal.z + terminal.z);\n" +
-            "    return vec3(terminal.x / magnitude, terminal.y / magnitude, terminal.z / magnitude);\n" +
+            "Ray SetRayMagnitude(Ray ray, float len){\n" +
+            "    vec3 dif = ray.direction - ray.origin;\n" +
+            "    float magnitude = sqrt(dif.x * dif.x + dif.y * dif.y + dif.z * dif.z);\n" +
+            "\n" +
+            "    Ray newRay;\n" +
+            "    newRay.origin = ray.origin;\n" +
+            "    newRay.direction = vec3((dif.x / magnitude) * len, (dif.y / magnitude) * len, (dif.z / magnitude) * len) + ray.origin;\n" +
+            "    return newRay;\n" +
+            "}\n" +
+            "\n" +
+            "HitInfo RaySphere(Ray ray, Sphere sphere){\n" +
+            "    HitInfo hitInfo;\n" +
+            "    ray = SetRayMagnitude(ray, 1.0);\n" +
+            "    float dist = RaySphereIntersect(ray.origin, ray.direction, sphere.position, sphere.radius);\n" +
+            "\n" +
+            "    hitInfo.didHit = false;\n" +
+            "\n" +
+            "    if(dist >= 0){\n" +
+            "        hitInfo.didHit = true;\n" +
+            "        hitInfo.dist = dist;\n" +
+            "        hitInfo.hitPoint = SetRayMagnitude(ray, dist).direction;\n" +
+            "\n" +
+            "        Ray normalRay;\n" +
+            "        normalRay.origin = sphere.position;\n" +
+            "        normalRay.direction = hitInfo.hitPoint;\n" +
+            "\n" +
+            "        hitInfo.normal = SetRayMagnitude(normalRay, 1.0);\n" +
+            "    }\n" +
+            "    return hitInfo;\n" +
             "}\n" +
             "\n" +
             "void main() {\n" +
@@ -65,13 +111,26 @@ public class Scene{
             "\n" +
             "    float planeWidth = tan(FOV * 0.5 * (PI/180.0)) * 2.0;\n" +
             "    float planeHeight = planeWidth * RATIO;\n" +
-            "    vec3 raydir = vec3(planeHeight * fragCoord.x, planeWidth * fragCoord.y, 1);\n" +
-            "    vec3 nraydir = normalize(raydir);\n" +
+            "\n" +
+            "    Ray ray;\n" +
+            "    ray.origin = vec3(0.0, 0.0, 0.0);\n" +
+            "    ray.direction = vec3(planeHeight * fragCoord.x, planeWidth * fragCoord.y, 1);\n" +
+            "\n" +
+            "    HitInfo closestHit;\n" +
+            "    closestHit.didHit = false;\n" +
             "\n" +
             "    for(int i = 0; i < sphereList.length(); i++) {\n" +
-            "        if(raySphereIntersect(vec3(0.0, 0.0, 0.0), nraydir, sphereList[i].position, sphereList[i].radius) >= 0){\n" +
-            "            color = vec3(sphereList[i].color);\n" +
+            "        HitInfo thisHit = RaySphere(ray, sphereList[i]);\n" +
+            "        if(thisHit.didHit){\n" +
+            "            if(thisHit.dist < closestHit.dist || !closestHit.didHit){\n" +
+            "                closestHit = thisHit;\n" +
+            "                closestHit.material = sphereList[i].material;\n" +
+            "            }\n" +
             "        }\n" +
+            "    }\n" +
+            "\n" +
+            "    if(closestHit.didHit){\n" +
+            "        color = closestHit.material.color;\n" +
             "    }\n" +
             "\n" +
             "    gl_FragColor = vec4(color, 1.0);\n" +
