@@ -98,7 +98,6 @@ public class Window {
             scene.update();
 
             glfwSwapBuffers(glfwWindow);
-
         }
     }
 }

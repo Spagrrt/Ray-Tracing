@@ -3,7 +3,9 @@
 
 #define PI 3.1415926535
 #define FOV 75.0
-#define RATIO 16.0/9.0
+#define WIDTH 1920
+#define HEIGHT 1080
+#define RATIO WIDTH/HEIGHT
 
 struct Ray{
     vec3 origin;
@@ -89,7 +91,7 @@ void main() {
 
     vec3 color = vec3(0.0, 0.0, 0.0);
 
-    vec2 fragCoord = vec2(gl_FragCoord.x / (1920.0f / 2.0f) - 1.0f, gl_FragCoord.y / (1080.0f / 2.0f) - 1.0f);
+    vec2 fragCoord = vec2(gl_FragCoord.x / (WIDTH / 2.0f) - 1.0f, gl_FragCoord.y / (HEIGHT / 2.0f) - 1.0f);
 
     float planeWidth = tan(FOV * 0.5 * (PI/180.0)) * 2.0;
     float planeHeight = planeWidth * RATIO;

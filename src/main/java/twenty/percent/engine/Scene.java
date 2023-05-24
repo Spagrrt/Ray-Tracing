@@ -17,11 +17,15 @@ public class Scene{
             "    gl_Position = vec4(aPos, 1.0);\n" +
             "}";
 
-    private String fragmentShaderSrc = "#version 330 core\n" +
+    private String fragmentShaderSrc = "#version 330\n" +
             "\n" +
             "#define PI 3.1415926535\n" +
             "#define FOV 75.0\n" +
-            "#define RATIO 16.0/9.0\n" +
+            "#define WIDTH 1920\n" +
+            "#define HEIGHT 1080\n" +
+            "#define RATIO WIDTH/HEIGHT\n" +
+            "#define MAX_BOUNCE 10\n" +
+            "#define RAYS_PER_PIXEL 250\n" +
             "\n" +
             "struct Ray{\n" +
             "    vec3 origin;\n" +
@@ -30,6 +34,8 @@ public class Scene{
             "\n" +
             "struct Material{\n" +
             "    vec3 color;\n" +
+            "    vec3 emissionColor;\n" +
+            "    float emissionStrength;\n" +
             "};\n" +
             "\n" +
             "struct Sphere{\n" +
@@ -42,17 +48,28 @@ public class Scene{
             "    bool didHit;\n" +
             "    float dist;\n" +
             "    vec3 hitPoint;\n" +
-            "    Ray normal;\n" +
+            "    vec3 normal;\n" +
             "    Material material;\n" +
             "};\n" +
             "\n" +
-            "Sphere[] sphereList = { { vec3(0.0, 0.25, 3.0), 1.0, { vec3(0.0, 1.0, 0.0) }},\n" +
-            "                        { vec3(-0.75, 0.0, 3.0), 1.0, { vec3(1.0, 0.0, 0.0) }},\n" +
-            "                        { vec3(0.75, 0.0, 3.0), 1.0, { vec3(0.0, 0.0, 1.0) }}\n" +
+            "Sphere[] sphereList = { { vec3(0.0, 3.0, 10.0), 3.0, { vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0), 3.0 }},\n" +
+            "{ vec3(-2.75, 0.0, 3.0), 1.0, { vec3(1.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0), 0.0 }},\n" +
+            "{ vec3(2.75, 0.0, 3.0), 1.0, { vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, 0.0), 0.0 }},\n" +
+            "{ vec3(0.0, -10.0, 5.0), 9.0, { vec3(1.0, 0.0, 1.0), vec3(0.0, 0.0, 0.0), 0.0 }}\n" +
             "};\n" +
             "\n" +
             "\n" +
             "\n" +
+            "uint PixelIndex(){\n" +
+            "    return uint((gl_FragCoord.y * WIDTH) + gl_FragCoord.x);\n" +
+            "}\n" +
+            "\n" +
+            "float RandomValue(inout uint state){\n" +
+            "    state = state * uint(747796405) + uint(2891336453);\n" +
+            "    uint result = ((state >> ((state >> 28) + uint(4))) ^ state) * uint(277803737);\n" +
+            "    result = (result >> 22) ^ result;\n" +
+            "    return result / 4294967295.0;\n" +
+            "}\n" +
             "\n" +
             "// credit to wwwtyro on github\n" +
             "float RaySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr) {\n" +
@@ -73,12 +90,12 @@ public class Scene{
             "}\n" +
             "\n" +
             "Ray SetRayMagnitude(Ray ray, float len){\n" +
-            "    vec3 dif = ray.direction - ray.origin;\n" +
-            "    float magnitude = sqrt(dif.x * dif.x + dif.y * dif.y + dif.z * dif.z);\n" +
+            "    vec3 dir = ray.direction;\n" +
+            "    float magnitude = sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);\n" +
             "\n" +
             "    Ray newRay;\n" +
             "    newRay.origin = ray.origin;\n" +
-            "    newRay.direction = vec3((dif.x / magnitude) * len, (dif.y / magnitude) * len, (dif.z / magnitude) * len) + ray.origin;\n" +
+            "    newRay.direction = vec3((dir.x / magnitude) * len, (dir.y / magnitude) * len, (dir.z / magnitude) * len);\n" +
             "    return newRay;\n" +
             "}\n" +
             "\n" +
@@ -92,30 +109,31 @@ public class Scene{
             "    if(dist >= 0){\n" +
             "        hitInfo.didHit = true;\n" +
             "        hitInfo.dist = dist;\n" +
-            "        hitInfo.hitPoint = SetRayMagnitude(ray, dist).direction;\n" +
-            "\n" +
-            "        Ray normalRay;\n" +
-            "        normalRay.origin = sphere.position;\n" +
-            "        normalRay.direction = hitInfo.hitPoint;\n" +
-            "\n" +
-            "        hitInfo.normal = SetRayMagnitude(normalRay, 1.0);\n" +
+            "        hitInfo.hitPoint = SetRayMagnitude(ray, dist).direction + ray.origin;\n" +
+            "        hitInfo.normal = hitInfo.hitPoint - sphere.position;\n" +
             "    }\n" +
             "    return hitInfo;\n" +
             "}\n" +
             "\n" +
-            "void main() {\n" +
+            "vec3 RandomDirection(inout uint state){\n" +
+            "    while(true){\n" +
+            "        float x = RandomValue(state) * 2 - 1;\n" +
+            "        float y = RandomValue(state) * 2 - 1;\n" +
+            "        float z = RandomValue(state) * 2 - 1;\n" +
+            "        vec3 pointInCube = vec3(x, y, z);\n" +
+            "        float sqrDstFromCenter = dot(pointInCube, pointInCube);\n" +
+            "        if (sqrDstFromCenter <= 1){\n" +
+            "            return pointInCube / sqrt(sqrDstFromCenter);\n" +
+            "        }\n" +
+            "    }\n" +
+            "}\n" +
             "\n" +
-            "    vec3 color = vec3(0.0, 0.0, 0.0);\n" +
+            "vec3 RandomHemisphereDirection(vec3 normal, inout uint state){\n" +
+            "    vec3 dir = RandomDirection(state);\n" +
+            "    return dir * sign(dot(normal, dir));\n" +
+            "}\n" +
             "\n" +
-            "    vec2 fragCoord = vec2(gl_FragCoord.x / (1920.0f / 2.0f) - 1.0f, gl_FragCoord.y / (1080.0f / 2.0f) - 1.0f);\n" +
-            "\n" +
-            "    float planeWidth = tan(FOV * 0.5 * (PI/180.0)) * 2.0;\n" +
-            "    float planeHeight = planeWidth * RATIO;\n" +
-            "\n" +
-            "    Ray ray;\n" +
-            "    ray.origin = vec3(0.0, 0.0, 0.0);\n" +
-            "    ray.direction = vec3(planeHeight * fragCoord.x, planeWidth * fragCoord.y, 1);\n" +
-            "\n" +
+            "HitInfo CalculateRayCollision(Ray ray){\n" +
             "    HitInfo closestHit;\n" +
             "    closestHit.didHit = false;\n" +
             "\n" +
@@ -128,11 +146,52 @@ public class Scene{
             "            }\n" +
             "        }\n" +
             "    }\n" +
+            "    return closestHit;\n" +
+            "}\n" +
             "\n" +
-            "    if(closestHit.didHit){\n" +
-            "        color = closestHit.material.color;\n" +
+            "vec3 Trace(Ray ray, inout uint state){\n" +
+            "\n" +
+            "    vec3 incomingLight = vec3(0.0, 0.0, 0.0);\n" +
+            "    vec3 rayColor = vec3(1.0, 1.0, 1.0);\n" +
+            "\n" +
+            "    for(int i = 0; i <= MAX_BOUNCE; i++){\n" +
+            "        HitInfo hitinfo = CalculateRayCollision(ray);\n" +
+            "        if(hitinfo.didHit){\n" +
+            "            ray.origin = hitinfo.hitPoint;\n" +
+            "            ray.direction = RandomHemisphereDirection(hitinfo.normal, state);\n" +
+            "\n" +
+            "            Material material = hitinfo.material;\n" +
+            "            vec3 emittedLight = material.emissionColor * material.emissionStrength;\n" +
+            "            incomingLight += emittedLight * rayColor;\n" +
+            "            rayColor *= material.color;\n" +
+            "        }\n" +
+            "        else{\n" +
+            "            break;\n" +
+            "        }\n" +
             "    }\n" +
             "\n" +
+            "    return incomingLight;\n" +
+            "}\n" +
+            "\n" +
+            "void main() {\n" +
+            "\n" +
+            "    uint RNGState = PixelIndex();\n" +
+            "\n" +
+            "    vec2 fragCoord = vec2(gl_FragCoord.x / WIDTH - 0.5f, gl_FragCoord.y / HEIGHT - 0.5f);\n" +
+            "\n" +
+            "    float planeWidth = tan(FOV * 0.5 * (PI/180.0)) * 2.0;\n" +
+            "    float planeHeight = planeWidth * RATIO;\n" +
+            "\n" +
+            "    Ray ray;\n" +
+            "    ray.origin = vec3(0.0, 0.0, 0.0);\n" +
+            "    ray.direction = vec3(planeHeight * fragCoord.x, planeWidth * fragCoord.y, 1);\n" +
+            "\n" +
+            "    vec3 totalIncomingLight = vec3(0.0, 0.0, 0.0);\n" +
+            "\n" +
+            "    for(int i = 0; i < RAYS_PER_PIXEL; i++){\n" +
+            "        totalIncomingLight += Trace(ray, RNGState);\n" +
+            "    }\n" +
+            "    vec3 color = totalIncomingLight / RAYS_PER_PIXEL;\n" +
             "    gl_FragColor = vec4(color, 1.0);\n" +
             "}";
     private int vertexID, fragmentID, shaderProgram;
